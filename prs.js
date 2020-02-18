@@ -1,8 +1,15 @@
-const { octokit } = require('./kit.js');
-const contributors = require('./contributors');
+const fs = require("fs");
+
+const yargs = require("yargs");
+
+const { octokit } = require("./kit.js");
+const contributors = require("./contributors");
 
 const allPulls = octokit.pulls.list.endpoint.merge({
-  owner: 'mdn', repo: 'browser-compat-data', state: 'open', direction: 'asc',
+  owner: "mdn",
+  repo: "browser-compat-data",
+  state: "open",
+  direction: "asc"
 });
 
 async function* openPulls() {
@@ -11,21 +18,93 @@ async function* openPulls() {
   }
 }
 
+async function fetchPrDataFromFile() {
+  const path = "prdata.json";
+  let timeDiff;
+
+  try {
+    const { mtime } = fs.statSync(path);
+    timeDiff = new Date() - new Date(mtime);
+  } catch (err) {
+    if (err.code === "ENOENT") {
+      return null;
+    }
+    console.trace(err);
+  }
+
+  // 3600000 is one hour in miliseconds
+  if (timeDiff < 3600000) {
+    return JSON.parse(fs.readFileSync(path));
+  }
+  fs.unlinkSync(path);
+  return null;
+}
+
+async function fetchPrDataFromGitHub() {
+  const logins = new Set(await contributors.logins());
+  const isFirstTimer = login => !logins.has(login);
+
+  const data = [];
+
+  for await (const pull of openPulls()) {
+    data.push({
+      pull_url: pull.html_url,
+      author: pull.user.login,
+      isFirstTimer: isFirstTimer(pull.user.login)
+    });
+  }
+
+  return data;
+}
+
+async function getPrData() {
+  const fromFile = await fetchPrDataFromFile();
+  if (fromFile === null) {
+    const data = await fetchPrDataFromGitHub();
+    fs.writeFileSync("prdata.json", JSON.stringify(data));
+    return data;
+  }
+  return fromFile;
+}
+
+function tabbed(args) {
+  return args.join("\t");
+}
+
+function hyperlink(pull_url) {
+  const number = pull_url.match(
+    /https:\/\/github\.com\/.*?\/.*?\/pull\/(\d+)/
+  )[1];
+
+  return `=HYPERLINK("${pull_url}", "#${number}")`;
+}
+
 async function main() {
   try {
-    const logins = new Set(await contributors.logins());
+    const data = await getPrData();
 
-    const isFirstTimer = login => !logins.has(login);
-
-    for await (const pull of openPulls()) {
-      const link = `=HYPERLINK("${pull.html_url}", "#${pull.number}")`;
-      const info = [
-        pull.user.login,
-        `${isFirstTimer(pull.user.login)}`.toUpperCase(),
-        link,
-      ];
-      console.log(info.join('\t'));
-    }
+    yargs
+      .command(
+        "all",
+        "print all spreadsheet data",
+        () => {},
+        () => {
+          for (const { pull_url, author, isFirstTimer } of data) {
+            const firstTimer = isFirstTimer.toString().toUpperCase();
+            console.log(tabbed([hyperlink(pull_url), author, firstTimer]));
+          }
+        }
+      )
+      .command(
+        "pulls",
+        "print pull links only",
+        () => {},
+        () => {
+          for (const { pull_url } of data) {
+            console.log(tabbed([hyperlink(pull_url)]));
+          }
+        }
+      ).argv;
   } catch (exc) {
     console.trace(exc);
   }
