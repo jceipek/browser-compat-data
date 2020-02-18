@@ -11,7 +11,7 @@
   "author": "",
   "license": "CC0-1.0",
   "dependencies": {
-    "@octokit/rest": "^16.27.0",
+    "@octokit/rest": "^16.43.1",
     "yargs": "^14.0.0"
   },
   "devDependencies": {

@@ -1,10 +1,7 @@
-const auth = {
-  clientId: process.env.CLIENT_ID,
-  clientSecret: process.env.CLIENT_SECRET,
-};
-
-const Octokit = require('@octokit/rest');
+const { Octokit } = require("@octokit/rest");
 
 module.exports = {
-  octokit: new Octokit({ auth }),
+  octokit: new Octokit({
+    auth: process.env.GITHUB_PERSONAL_ACCESS_TOKEN
+  })
 };
