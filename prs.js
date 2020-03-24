@@ -1,15 +1,17 @@
-const fs = require("fs");
+#!/usr/bin/env node
 
-const yargs = require("yargs");
+const fs = require('fs');
 
-const { octokit } = require("./kit.js");
-const contributors = require("./contributors");
+const yargs = require('yargs');
+
+const { octokit } = require('./kit.js');
+const contributors = require('./contributors');
 
 const allPulls = octokit.pulls.list.endpoint.merge({
-  owner: "mdn",
-  repo: "browser-compat-data",
-  state: "open",
-  direction: "asc"
+  owner: 'mdn',
+  repo: 'browser-compat-data',
+  state: 'open',
+  direction: 'asc',
 });
 
 async function* openPulls() {
@@ -19,14 +21,14 @@ async function* openPulls() {
 }
 
 async function fetchPrDataFromFile() {
-  const path = "prdata.json";
+  const path = 'prdata.json';
   let timeDiff;
 
   try {
     const { mtime } = fs.statSync(path);
     timeDiff = new Date() - new Date(mtime);
   } catch (err) {
-    if (err.code === "ENOENT") {
+    if (err.code === 'ENOENT') {
       return null;
     }
     console.trace(err);
@@ -50,30 +52,30 @@ async function fetchPrDataFromGitHub() {
     data.push({
       pull_url: pull.html_url,
       author: pull.user.login,
-      isFirstTimer: isFirstTimer(pull.user.login)
+      isFirstTimer: isFirstTimer(pull.user.login),
     });
   }
 
   return data;
 }
 
-async function getPrData() {
+async function getPrData(force = false) {
   const fromFile = await fetchPrDataFromFile();
-  if (fromFile === null) {
+  if (force === true || fromFile === null) {
     const data = await fetchPrDataFromGitHub();
-    fs.writeFileSync("prdata.json", JSON.stringify(data));
+    fs.writeFileSync('prdata.json', JSON.stringify(data));
     return data;
   }
   return fromFile;
 }
 
 function tabbed(args) {
-  return args.join("\t");
+  return args.join('\t');
 }
 
 function hyperlink(pull_url) {
   const number = pull_url.match(
-    /https:\/\/github\.com\/.*?\/.*?\/pull\/(\d+)/
+    /https:\/\/github\.com\/.*?\/.*?\/pull\/(\d+)/,
   )[1];
 
   return `=HYPERLINK("${pull_url}", "#${number}")`;
@@ -81,29 +83,37 @@ function hyperlink(pull_url) {
 
 async function main() {
   try {
-    const data = await getPrData();
-
     yargs
       .command(
-        "all",
-        "print all spreadsheet data",
+        'fetch',
+        'get PR data',
         () => {},
-        () => {
-          for (const { pull_url, author, isFirstTimer } of data) {
+        async () => {
+          console.log('Getting PR data…');
+          await getPrData(true);
+          console.log('Done.');
+        },
+      )
+      .command(
+        'all',
+        'print all spreadsheet data',
+        () => {},
+        async () => {
+          for (const { pull_url, author, isFirstTimer } of await getPrData()) {
             const firstTimer = isFirstTimer.toString().toUpperCase();
             console.log(tabbed([hyperlink(pull_url), author, firstTimer]));
           }
-        }
+        },
       )
       .command(
-        "pulls",
-        "print pull links only",
+        'pulls',
+        'print pull links only',
         () => {},
-        () => {
-          for (const { pull_url } of data) {
+        async () => {
+          for (const { pull_url } of await getPrData()) {
             console.log(tabbed([hyperlink(pull_url)]));
           }
-        }
+        },
       ).argv;
   } catch (exc) {
     console.trace(exc);
