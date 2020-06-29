@@ -6,7 +6,9 @@
   "scripts": {
     "test": "eslint '**.js'",
     "list-collaborators": "node ./contributors.js",
-    "list-prs": "node ./prs.js"
+    "list-prs": "node ./prs.js",
+    "copy-pulls": "node ./prs.js pulls | pbcopy && osascript -e 'display notification \"Pull request numbers copied\" with title \"BCD meta\"'",
+    "copy": "node ./prs.js all | pbcopy && osascript -e 'display notification \"Pull request data copied\" with title \"BCD meta\"'"
   },
   "author": "",
   "license": "CC0-1.0",
