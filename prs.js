@@ -42,6 +42,18 @@ async function fetchPrDataFromFile() {
   return null;
 }
 
+async function calculateSize(pull) {
+  const [owner, repo] = pull.base.repo.full_name.split('/');
+  const pullDetail = await octokit.pulls.get({
+    owner,
+    repo,
+    pull_number: pull.number,
+  });
+  const { additions, deletions } = pullDetail.data;
+
+  return additions + deletions;
+}
+
 async function fetchPrDataFromGitHub() {
   const logins = new Set(await contributors.logins());
   const isFirstTimer = login => !logins.has(login);
@@ -53,6 +65,7 @@ async function fetchPrDataFromGitHub() {
       pull_url: pull.html_url,
       author: pull.user.login,
       isFirstTimer: isFirstTimer(pull.user.login),
+      size: await calculateSize(pull),
     });
   }
 
@@ -99,9 +112,11 @@ async function main() {
         'print all spreadsheet data',
         () => {},
         async () => {
-          for (const { pull_url, author, isFirstTimer } of await getPrData()) {
-            const firstTimer = isFirstTimer.toString().toUpperCase();
-            console.log(tabbed([hyperlink(pull_url), author, firstTimer]));
+          for (const p of await getPrData()) {
+            const firstTimer = p.isFirstTimer.toString().toUpperCase();
+            console.log(
+              tabbed([hyperlink(p.pull_url), p.author, p.firstTimer, p.size]),
+            );
           }
         },
       )
