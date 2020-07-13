@@ -5,7 +5,6 @@ const fs = require('fs');
 const yargs = require('yargs');
 
 const { octokit } = require('./kit.js');
-const contributors = require('./contributors');
 
 const allPulls = octokit.pulls.list.endpoint.merge({
   owner: 'mdn',
@@ -55,16 +54,15 @@ async function calculateSize(pull) {
 }
 
 async function fetchPrDataFromGitHub() {
-  const logins = new Set(await contributors.logins());
-  const isFirstTimer = login => !logins.has(login);
-
   const data = [];
 
   for await (const pull of openPulls()) {
     data.push({
       pull_url: pull.html_url,
       author: pull.user.login,
-      isFirstTimer: isFirstTimer(pull.user.login),
+      isFirstTimer: ['FIRST_TIMER', 'FIRST_TIME_CONTRIBUTOR'].includes(
+        pull.author_association,
+      ),
       size: await calculateSize(pull),
     });
   }
@@ -115,7 +113,7 @@ async function main() {
           for (const p of await getPrData()) {
             const firstTimer = p.isFirstTimer.toString().toUpperCase();
             console.log(
-              tabbed([hyperlink(p.pull_url), p.author, p.firstTimer, p.size]),
+              tabbed([hyperlink(p.pull_url), p.author, firstTimer, p.size]),
             );
           }
         },
